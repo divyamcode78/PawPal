@@ -1,7 +1,7 @@
 // Simple test script for authentication endpoints
 // Run with: node test-auth.js
 
-const BASE_URL = 'http://localhost:5173';
+const BASE_URL = 'http://localhost:5172';
 
 async function testAuth() {
   console.log('🧪 Testing PawPal Authentication System\n');
