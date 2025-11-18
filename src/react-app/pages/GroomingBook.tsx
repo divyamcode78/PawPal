@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router';
 import { Calendar, Clock, Dog, Scissors, ArrowRight } from 'lucide-react';
 import Navbar from '@/react-app/components/Navbar';
 import { useAuth } from '@/react-app/hooks/useAuth';
-import typy { Pet } from '@/shared/types';
+import type { Pet } from '@/shared/types';
 
 const SERVICE_OPTIONS = [
   { id: 'bath', label: 'Bath & Blow Dry', price: 29.0 },
