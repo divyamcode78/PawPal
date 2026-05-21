@@ -27,6 +27,7 @@ export default function Dashboard() {
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAddPet, setShowAddPet] = useState(false);
+  const [editingPet, setEditingPet] = useState<Pet | null>(null);
 
   useEffect(() => {
     if (!isLoading && !user) {
@@ -72,6 +73,7 @@ export default function Dashboard() {
 
   const handlePetAdded = () => {
     setShowAddPet(false);
+    setEditingPet(null);
     fetchData();
   };
 
@@ -178,7 +180,7 @@ export default function Dashboard() {
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {pets.map((pet) => (
-                  <PetCard key={pet.id} pet={pet} />
+                  <PetCard key={pet.id} pet={pet} onClick={setEditingPet} />
                 ))}
               </div>
             )}
@@ -210,6 +212,14 @@ export default function Dashboard() {
       {showAddPet && (
         <AddPetModal
           onClose={() => setShowAddPet(false)}
+          onPetAdded={handlePetAdded}
+        />
+      )}
+
+      {editingPet && (
+        <AddPetModal
+          pet={editingPet}
+          onClose={() => setEditingPet(null)}
           onPetAdded={handlePetAdded}
         />
       )}

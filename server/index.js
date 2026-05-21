@@ -56,6 +56,13 @@ function verifyToken(token) {
 
 const now = () => new Date().toISOString();
 
+/** MongoDB driver 6+ returns the document directly; older drivers use { value }. */
+function findOneAndUpdateDoc(result) {
+  if (result == null) return null;
+  if (typeof result === 'object' && 'value' in result) return result.value ?? null;
+  return result;
+}
+
 // ============ Authentication Middleware ============
 const authRequired = (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -205,11 +212,12 @@ async function start() {
           { returnDocument: 'after', projection: { password_hash: 0 } }
         );
 
-        if (!result.value) {
+        const user = findOneAndUpdateDoc(result);
+        if (!user) {
           return res.status(404).json({ error: 'user not found' });
         }
 
-        return res.json({ user: result.value });
+        return res.json({ user });
       } catch (error) {
         console.error('Profile update error:', error);
         return res.status(500).json({ error: 'internal server error' });
@@ -255,6 +263,40 @@ async function start() {
         return res.json(pet);
       } catch (error) {
         console.error('Get pet error:', error);
+        return res.status(500).json({ error: 'internal server error' });
+      }
+    });
+
+    app.put('/api/pets/:petId', authRequired, async (req, res) => {
+      try {
+        const existing = await pets.findOne({ id: req.params.petId, userId: req.userId });
+        if (!existing) {
+          return res.status(404).json({ error: 'pet not found' });
+        }
+
+        const { name, species, breed, birth_date, age, weight, gender, photo_url, microchip_id } = req.body;
+        if (!name) {
+          return res.status(400).json({ error: 'name is required' });
+        }
+
+        const updates = {
+          name,
+          species: species ?? existing.species,
+          breed: breed ?? existing.breed,
+          birth_date: birth_date ?? existing.birth_date,
+          age: age ?? existing.age,
+          weight: weight ?? existing.weight,
+          gender: gender ?? existing.gender,
+          photo_url: photo_url ?? existing.photo_url,
+          microchip_id: microchip_id ?? existing.microchip_id,
+          updated_at: now(),
+        };
+
+        await pets.updateOne({ id: req.params.petId, userId: req.userId }, { $set: updates });
+        const updated = await pets.findOne({ id: req.params.petId, userId: req.userId });
+        return res.json(updated);
+      } catch (error) {
+        console.error('Update pet error:', error);
         return res.status(500).json({ error: 'internal server error' });
       }
     });
@@ -345,16 +387,32 @@ async function start() {
     // ============ Doctor Appointments Endpoints ============
     app.post('/api/doctor-appointments', authRequired, async (req, res) => {
       try {
-        const { petId, doctorName, date, time, reason } = req.body;
+        const petId = req.body.petId ?? req.body.pet_id;
+        const date = req.body.date ?? req.body.appointment_date;
+        const time = req.body.time ?? req.body.time_slot;
+        const visitType = req.body.visit_type ?? req.body.reason;
+        const price = req.body.price;
         if (!petId || !date) {
           return res.status(400).json({ error: 'petId and date are required' });
         }
 
         const id = getUserId();
         const timestamp = now();
-        const appointment = { 
-          id, petId, userId: req.userId, doctorName, date, time, reason, 
-          status: 'confirmed', created_at: timestamp, updated_at: timestamp 
+        const appointment = {
+          id,
+          petId,
+          pet_id: petId,
+          userId: req.userId,
+          date,
+          appointment_date: date,
+          time,
+          time_slot: time,
+          visit_type: visitType,
+          reason: visitType,
+          price,
+          status: 'confirmed',
+          created_at: timestamp,
+          updated_at: timestamp,
         };
 
         await doctorAppointments.insertOne(appointment);
@@ -412,10 +470,11 @@ async function start() {
           { returnDocument: 'after' }
         );
 
-        if (!result.value) {
+        const doc = findOneAndUpdateDoc(result);
+        if (!doc) {
           return res.status(404).json({ error: 'appointment not found' });
         }
-        return res.json(result.value);
+        return res.json(doc);
       } catch (error) {
         console.error('Cancel doctor appointment (PATCH) error:', error);
         return res.status(500).json({ error: 'internal server error' });
@@ -430,10 +489,11 @@ async function start() {
           { returnDocument: 'after' }
         );
 
-        if (!result.value) {
+        const doc = findOneAndUpdateDoc(result);
+        if (!doc) {
           return res.status(404).json({ error: 'appointment not found' });
         }
-        return res.json(result.value);
+        return res.json(doc);
       } catch (error) {
         console.error('Cancel doctor appointment (POST) error:', error);
         return res.status(500).json({ error: 'internal server error' });
@@ -449,10 +509,11 @@ async function start() {
           { returnDocument: 'after' }
         );
 
-        if (!result.value) {
+        const doc = findOneAndUpdateDoc(result);
+        if (!doc) {
           return res.status(404).json({ error: 'appointment not found' });
         }
-        return res.json(result.value);
+        return res.json(doc);
       } catch (error) {
         console.error('Update doctor appointment error:', error);
         return res.status(500).json({ error: 'internal server error' });
@@ -462,16 +523,32 @@ async function start() {
     // ============ Grooming Endpoints ============
     app.post('/api/groomings', authRequired, async (req, res) => {
       try {
-        const { petId, groomerName, date, time, services } = req.body;
+        const petId = req.body.petId ?? req.body.pet_id;
+        const date = req.body.date ?? req.body.appointment_date;
+        const time = req.body.time ?? req.body.time_slot;
+        const serviceType = req.body.services ?? req.body.service_type;
+        const price = req.body.price;
         if (!petId || !date) {
           return res.status(400).json({ error: 'petId and date are required' });
         }
 
         const id = getUserId();
         const timestamp = now();
-        const booking = { 
-          id, petId, userId: req.userId, groomerName, date, time, services,
-          status: 'confirmed', created_at: timestamp, updated_at: timestamp 
+        const booking = {
+          id,
+          petId,
+          pet_id: petId,
+          userId: req.userId,
+          date,
+          appointment_date: date,
+          time,
+          time_slot: time,
+          services: serviceType,
+          service_type: serviceType,
+          price,
+          status: 'confirmed',
+          created_at: timestamp,
+          updated_at: timestamp,
         };
 
         await groomingBookings.insertOne(booking);
@@ -529,10 +606,11 @@ async function start() {
           { returnDocument: 'after' }
         );
 
-        if (!result.value) {
+        const doc = findOneAndUpdateDoc(result);
+        if (!doc) {
           return res.status(404).json({ error: 'grooming not found' });
         }
-        return res.json(result.value);
+        return res.json(doc);
       } catch (error) {
         console.error('Cancel grooming (PATCH) error:', error);
         return res.status(500).json({ error: 'internal server error' });
@@ -547,10 +625,11 @@ async function start() {
           { returnDocument: 'after' }
         );
 
-        if (!result.value) {
+        const doc = findOneAndUpdateDoc(result);
+        if (!doc) {
           return res.status(404).json({ error: 'grooming not found' });
         }
-        return res.json(result.value);
+        return res.json(doc);
       } catch (error) {
         console.error('Cancel grooming (POST) error:', error);
         return res.status(500).json({ error: 'internal server error' });
@@ -566,10 +645,11 @@ async function start() {
           { returnDocument: 'after' }
         );
 
-        if (!result.value) {
+        const doc = findOneAndUpdateDoc(result);
+        if (!doc) {
           return res.status(404).json({ error: 'grooming not found' });
         }
-        return res.json(result.value);
+        return res.json(doc);
       } catch (error) {
         console.error('Update grooming error:', error);
         return res.status(500).json({ error: 'internal server error' });

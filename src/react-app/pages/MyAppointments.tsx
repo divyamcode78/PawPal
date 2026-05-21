@@ -10,7 +10,7 @@ export default function MyAppointmentsPage() {
   const { user, logout, isAuthenticated, isLoading } = useAuth();
   const [appointments, setAppointments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -76,21 +76,49 @@ export default function MyAppointmentsPage() {
     navigate('/appointments', { replace: true, state: {} as any });
   }, [location?.state]);
 
-  const cancelAppointment = async (id: number) => {
-    if (!confirm('Cancel this appointment?')) return;
-    setCancellingId(id);
+  const removeFromLocalStorage = (id: string | number) => {
     try {
+      const key = 'doctor_appointments';
+      const existing = JSON.parse(localStorage.getItem(key) || '[]');
+      const next = Array.isArray(existing) ? existing.filter((x: any) => String(x.id) !== String(id)) : [];
+      localStorage.setItem(key, JSON.stringify(next));
+    } catch {}
+  };
+
+  const cancelAppointment = async (id: string | number) => {
+    if (!confirm('Cancel this appointment?')) return;
+    const idStr = String(id);
+    setCancellingId(idStr);
+    try {
+      if (idStr === 'temp') {
+        setAppointments((prev) => prev.filter((b) => String(b.id) !== idStr));
+        removeFromLocalStorage(id);
+        return;
+      }
+
       const token = localStorage.getItem('authToken');
       const headers: HeadersInit = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      let resp = await fetch(`/api/doctor-appointments/${id}/cancel`, { method: 'PATCH', headers, credentials: 'include' });
+
+      let resp = await fetch(`/api/doctor-appointments/${encodeURIComponent(idStr)}/cancel`, { method: 'PATCH', headers, credentials: 'include' });
       if (!resp.ok) {
-        resp = await fetch(`/api/doctor-appointments/${id}/cancel`, { method: 'POST', headers, credentials: 'include' });
+        resp = await fetch(`/api/doctor-appointments/${encodeURIComponent(idStr)}/cancel`, { method: 'POST', headers, credentials: 'include' });
       }
       if (!resp.ok) {
-        resp = await fetch(`/api/doctor-appointments/${id}`, { method: 'PATCH', headers, credentials: 'include', body: JSON.stringify({ status: 'cancelled' }) });
+        resp = await fetch(`/api/doctor-appointments/${encodeURIComponent(idStr)}`, {
+          method: 'PATCH',
+          headers,
+          credentials: 'include',
+          body: JSON.stringify({ status: 'cancelled' }),
+        });
       }
+
       if (!resp.ok) {
+        if (resp.status === 404) {
+          setAppointments((prev) => prev.filter((b) => String(b.id) !== idStr));
+          removeFromLocalStorage(id);
+          return;
+        }
         const text = await resp.text().catch(() => '');
         try {
           const j = JSON.parse(text);
@@ -99,15 +127,12 @@ export default function MyAppointmentsPage() {
           throw new Error(text || 'Failed to cancel');
         }
       }
+
       const updated = await resp.json().catch(() => ({ id, status: 'cancelled' }));
-      setAppointments(prev => prev.map(b => (b.id === id ? { ...b, ...updated } : b)));
-      // Remove from localStorage persisted list
-      try {
-        const key = 'doctor_appointments';
-        const existing = JSON.parse(localStorage.getItem(key) || '[]');
-        const next = Array.isArray(existing) ? existing.filter((x: any) => String(x.id) !== String(id)) : [];
-        localStorage.setItem(key, JSON.stringify(next));
-      } catch {}
+      setAppointments((prev) =>
+        prev.map((b) => (String(b.id) === idStr ? { ...b, ...updated, status: 'cancelled' } : b))
+      );
+      removeFromLocalStorage(id);
     } catch (e) {
       alert((e as Error).message);
     } finally {
@@ -185,10 +210,10 @@ export default function MyAppointmentsPage() {
                     {(b.status === 'pending' || b.status === 'confirmed') && (
                       <button
                         onClick={() => cancelAppointment(b.id)}
-                        disabled={cancellingId === b.id}
+                        disabled={cancellingId === String(b.id)}
                         className="mt-2 text-sm text-red-600 hover:text-red-700 disabled:opacity-50 block w-full text-right"
                       >
-                        {cancellingId === b.id ? 'Cancelling...' : 'Cancel appointment'}
+                        {cancellingId === String(b.id) ? 'Cancelling...' : 'Cancel appointment'}
                       </button>
                     )}
                   </div>

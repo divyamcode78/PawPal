@@ -34,21 +34,33 @@ export default function DoctorConfirmPage() {
   const cancelAppointment = async () => {
     if (!id) return;
     if (!confirm('Cancel this appointment?')) return;
+    const idStr = String(id);
     try {
       const token = localStorage.getItem('authToken');
       const headers: HeadersInit = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      if (idStr === 'temp') {
+        try {
+          const key = 'doctor_appointments';
+          const existing = JSON.parse(localStorage.getItem(key) || '[]');
+          const next = Array.isArray(existing) ? existing.filter((x: any) => String(x.id) !== idStr) : [];
+          localStorage.setItem(key, JSON.stringify(next));
+        } catch {}
+        setAppointment((b: any) => (b ? { ...b, status: 'cancelled' } : b));
+        navigate('/appointments', { state: { remove: { id: idStr, pet_id: appointment?.pet_id, appointment_date: appointment?.appointment_date, time_slot: appointment?.time_slot, visit_type: appointment?.visit_type } } as any });
+        return;
+      }
+
       const prev = appointment;
       setAppointment((b: any) => (b ? { ...b, status: 'cancelled' } : b));
-      let resp = await fetch(`/api/doctor-appointments/${id}/cancel`, { method: 'PATCH', headers, credentials: 'include' });
+
+      let resp = await fetch(`/api/doctor-appointments/${encodeURIComponent(idStr)}/cancel`, { method: 'PATCH', headers, credentials: 'include' });
       if (!resp.ok) {
-        resp = await fetch(`/api/doctor-appointments/${id}/cancel`, { method: 'POST', headers, credentials: 'include' });
+        resp = await fetch(`/api/doctor-appointments/${encodeURIComponent(idStr)}/cancel`, { method: 'POST', headers, credentials: 'include' });
       }
       if (!resp.ok) {
-        resp = await fetch(`/api/doctor-appointments/${id}`, { method: 'PATCH', headers, credentials: 'include', body: JSON.stringify({ status: 'cancelled' }) });
-      }
-      if (!resp.ok) {
-        resp = await fetch(`/api/doctor-appointments/cancel/${id}`, { method: 'PATCH', headers, credentials: 'include' });
+        resp = await fetch(`/api/doctor-appointments/${encodeURIComponent(idStr)}`, { method: 'PATCH', headers, credentials: 'include', body: JSON.stringify({ status: 'cancelled' }) });
       }
       if (!resp.ok) {
         if (resp.status === 404) {

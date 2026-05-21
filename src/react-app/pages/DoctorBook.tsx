@@ -21,7 +21,7 @@ export default function DoctorBookPage() {
   const { user, logout, isAuthenticated, isLoading } = useAuth();
 
   const [pets, setPets] = useState<Pet[]>([]);
-  const [selectedPetId, setSelectedPetId] = useState<number | null>(null);
+  const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
   const [visitType, setVisitType] = useState<VisitId>('checkup');
   const [date, setDate] = useState<string>(() => {
     const d = new Date();

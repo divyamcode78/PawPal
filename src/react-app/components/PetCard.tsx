@@ -1,13 +1,12 @@
-import { useNavigate } from 'react-router';
 import { Calendar, Heart } from 'lucide-react';
 import type { Pet } from '@/shared/types';
 
 interface PetCardProps {
   pet: Pet;
+  onClick?: (pet: Pet) => void;
 }
 
-export default function PetCard({ pet }: PetCardProps) {
-  const navigate = useNavigate();
+export default function PetCard({ pet, onClick }: PetCardProps) {
 
   const formatAge = (birthDate: string | null) => {
     if (!birthDate) return 'Unknown age';
@@ -26,7 +25,15 @@ export default function PetCard({ pet }: PetCardProps) {
 
   return (
     <div
-      onClick={() => navigate(`/pets/${pet.id}`)}
+      onClick={() => onClick?.(pet)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onClick?.(pet);
+        }
+      }}
       className="bg-white/70 backdrop-blur-lg rounded-2xl p-6 shadow-lg border border-white/20 hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer group"
     >
       <div className="flex items-start space-x-4">
@@ -72,7 +79,7 @@ export default function PetCard({ pet }: PetCardProps) {
 
       <div className="mt-4 pt-4 border-t border-gray-100">
         <div className="flex items-center justify-between">
-          <span className="text-sm text-gray-500">View health records</span>
+          <span className="text-sm text-gray-500">Click to edit pet</span>
           <div className="w-6 h-6 bg-gradient-to-br from-orange-400 to-pink-500 rounded-full flex items-center justify-center group-hover:scale-110 transition-transform">
             <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />

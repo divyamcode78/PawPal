@@ -36,29 +36,35 @@ export default function GroomingConfirmPage() {
   const cancelBooking = async () => {
     if (!id) return;
     if (!confirm('Cancel this booking?')) return;
+    const idStr = String(id);
     try {
       const token = localStorage.getItem('authToken');
       const headers: HeadersInit = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      // Optimistically update UI
+
+      if (idStr === 'temp') {
+        try {
+          const key = 'grooming_bookings';
+          const existing = JSON.parse(localStorage.getItem(key) || '[]');
+          const next = Array.isArray(existing) ? existing.filter((x: any) => String(x.id) !== idStr) : [];
+          localStorage.setItem(key, JSON.stringify(next));
+        } catch {}
+        setBooking((b: any) => (b ? { ...b, status: 'cancelled' } : b));
+        navigate('/bookings', { state: { remove: { id: idStr, pet_id: booking?.pet_id, appointment_date: booking?.appointment_date, time_slot: booking?.time_slot, service_type: booking?.service_type } } as any });
+        return;
+      }
+
       const prev = booking;
       setBooking((b: any) => (b ? { ...b, status: 'cancelled' } : b));
-      // Try PATCH /cancel
-      let resp = await fetch(`/api/groomings/${id}/cancel`, { method: 'PATCH', headers, credentials: 'include' });
+
+      let resp = await fetch(`/api/groomings/${encodeURIComponent(idStr)}/cancel`, { method: 'PATCH', headers, credentials: 'include' });
       if (!resp.ok) {
-        // Try POST /cancel
-        resp = await fetch(`/api/groomings/${id}/cancel`, { method: 'POST', headers, credentials: 'include' });
+        resp = await fetch(`/api/groomings/${encodeURIComponent(idStr)}/cancel`, { method: 'POST', headers, credentials: 'include' });
       }
       if (!resp.ok) {
-        // Try PATCH root with status body
-        resp = await fetch(`/api/groomings/${id}`, { method: 'PATCH', headers, credentials: 'include', body: JSON.stringify({ status: 'cancelled' }) });
+        resp = await fetch(`/api/groomings/${encodeURIComponent(idStr)}`, { method: 'PATCH', headers, credentials: 'include', body: JSON.stringify({ status: 'cancelled' }) });
       }
       if (!resp.ok) {
-        // Try alternate path /groomings/cancel/:id
-        resp = await fetch(`/api/groomings/cancel/${id}`, { method: 'PATCH', headers, credentials: 'include' });
-      }
-      if (!resp.ok) {
-        // If backend returns 404, treat it as already-removed and clean up UI
         if (resp.status === 404) {
           alert('Booking cancelled');
           // Remove from localStorage persisted list

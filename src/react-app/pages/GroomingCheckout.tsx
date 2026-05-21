@@ -21,7 +21,7 @@ export default function GroomingCheckoutPage() {
   const [placing, setPlacing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  const petId = Number(params.get('petId'));
+  const petId = params.get('petId') ?? '';
   const service = params.get('service') || 'bath';
   const date = params.get('date') || '';
   const time = params.get('time') || '';

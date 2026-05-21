@@ -21,7 +21,7 @@ export default function GroomingBookPage() {
   const { user, logout, isAuthenticated, isLoading } = useAuth();
 
   const [pets, setPets] = useState<Pet[]>([]);
-  const [selectedPetId, setSelectedPetId] = useState<number | null>(null);
+  const [selectedPetId, setSelectedPetId] = useState<string | null>(null);
   const [serviceType, setServiceType] = useState<ServiceId>('bath');
   const [date, setDate] = useState<string>(() => {
     // Default to today so users immediately see slots

@@ -10,7 +10,7 @@ export default function MyBookingsPage() {
   const { user, logout, isAuthenticated, isLoading } = useAuth();
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -82,24 +82,49 @@ export default function MyBookingsPage() {
     navigate('/bookings', { replace: true, state: {} as any });
   }, [location?.state]);
 
-  const cancelBooking = async (id: number) => {
-    if (!confirm('Cancel this booking?')) return;
-    setCancellingId(id);
+  const removeFromLocalStorage = (id: string | number) => {
     try {
+      const key = 'grooming_bookings';
+      const existing = JSON.parse(localStorage.getItem(key) || '[]');
+      const next = Array.isArray(existing) ? existing.filter((x: any) => String(x.id) !== String(id)) : [];
+      localStorage.setItem(key, JSON.stringify(next));
+    } catch {}
+  };
+
+  const cancelBooking = async (id: string | number) => {
+    if (!confirm('Cancel this booking?')) return;
+    const idStr = String(id);
+    setCancellingId(idStr);
+    try {
+      if (idStr === 'temp') {
+        setBookings((prev) => prev.filter((b) => String(b.id) !== idStr));
+        removeFromLocalStorage(id);
+        return;
+      }
+
       const token = localStorage.getItem('authToken');
       const headers: HeadersInit = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
-      // Try PATCH /cancel
-      let resp = await fetch(`/api/groomings/${id}/cancel`, { method: 'PATCH', headers, credentials: 'include' });
+
+      let resp = await fetch(`/api/groomings/${encodeURIComponent(idStr)}/cancel`, { method: 'PATCH', headers, credentials: 'include' });
       if (!resp.ok) {
-        // Try POST /cancel
-        resp = await fetch(`/api/groomings/${id}/cancel`, { method: 'POST', headers, credentials: 'include' });
+        resp = await fetch(`/api/groomings/${encodeURIComponent(idStr)}/cancel`, { method: 'POST', headers, credentials: 'include' });
       }
       if (!resp.ok) {
-        // Try PATCH / with body
-        resp = await fetch(`/api/groomings/${id}`, { method: 'PATCH', headers, credentials: 'include', body: JSON.stringify({ status: 'cancelled' }) });
+        resp = await fetch(`/api/groomings/${encodeURIComponent(idStr)}`, {
+          method: 'PATCH',
+          headers,
+          credentials: 'include',
+          body: JSON.stringify({ status: 'cancelled' }),
+        });
       }
+
       if (!resp.ok) {
+        if (resp.status === 404) {
+          setBookings((prev) => prev.filter((b) => String(b.id) !== idStr));
+          removeFromLocalStorage(id);
+          return;
+        }
         const text = await resp.text().catch(() => '');
         try {
           const j = JSON.parse(text);
@@ -108,15 +133,12 @@ export default function MyBookingsPage() {
           throw new Error(text || 'Failed to cancel');
         }
       }
+
       const updated = await resp.json().catch(() => ({ id, status: 'cancelled' }));
-      setBookings(prev => prev.map(b => (b.id === id ? { ...b, ...updated } : b)));
-      // Remove from localStorage persisted list
-      try {
-        const key = 'grooming_bookings';
-        const existing = JSON.parse(localStorage.getItem(key) || '[]');
-        const next = Array.isArray(existing) ? existing.filter((x: any) => String(x.id) !== String(id)) : [];
-        localStorage.setItem(key, JSON.stringify(next));
-      } catch {}
+      setBookings((prev) =>
+        prev.map((b) => (String(b.id) === idStr ? { ...b, ...updated, status: 'cancelled' } : b))
+      );
+      removeFromLocalStorage(id);
     } catch (e) {
       alert((e as Error).message);
     } finally {
@@ -194,10 +216,10 @@ export default function MyBookingsPage() {
                     {(b.status === 'pending' || b.status === 'confirmed') && (
                       <button
                         onClick={() => cancelBooking(b.id)}
-                        disabled={cancellingId === b.id}
+                        disabled={cancellingId === String(b.id)}
                         className="mt-2 text-sm text-red-600 hover:text-red-700 disabled:opacity-50 block w-full text-right"
                       >
-                        {cancellingId === b.id ? 'Cancelling...' : 'Cancel booking'}
+                        {cancellingId === String(b.id) ? 'Cancelling...' : 'Cancel booking'}
                       </button>
                     )}
                   </div>

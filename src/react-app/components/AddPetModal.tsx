@@ -1,25 +1,42 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { useAuth } from '@/react-app/hooks/useAuth';
-import type { CreatePet } from '@/shared/types';
+import type { CreatePet, Pet } from '@/shared/types';
 
 interface AddPetModalProps {
   onClose: () => void;
   onPetAdded: () => void;
+  pet?: Pet;
 }
 
-export default function AddPetModal({ onClose, onPetAdded }: AddPetModalProps) {
+function petToFormData(pet: Pet): CreatePet {
+  return {
+    name: pet.name || '',
+    species: pet.species || '',
+    breed: pet.breed || '',
+    birth_date: pet.birth_date || '',
+    weight: pet.weight ?? undefined,
+    gender: (pet.gender as CreatePet['gender']) || undefined,
+    photo_url: pet.photo_url || '',
+    microchip_id: pet.microchip_id || '',
+  };
+}
+
+export default function AddPetModal({ onClose, onPetAdded, pet }: AddPetModalProps) {
+  const isEdit = Boolean(pet);
   const { redirectToLogin, user } = useAuth();
-  const [formData, setFormData] = useState<CreatePet>({
-    name: '',
-    species: '',
-    breed: '',
-    birth_date: '',
-    weight: undefined,
-    gender: undefined,
-    photo_url: '',
-    microchip_id: '',
-  });
+  const [formData, setFormData] = useState<CreatePet>(() =>
+    pet ? petToFormData(pet) : {
+      name: '',
+      species: '',
+      breed: '',
+      birth_date: '',
+      weight: undefined,
+      gender: undefined,
+      photo_url: '',
+      microchip_id: '',
+    }
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -52,8 +69,9 @@ export default function AddPetModal({ onClose, onPetAdded }: AddPetModalProps) {
         Object.entries(formData).filter(([_, v]) => v !== '' && v !== undefined && v !== null)
       );
 
-      const response = await fetch('/api/pets', {
-        method: 'POST',
+      const url = isEdit && pet ? `/api/pets/${pet.id}` : '/api/pets';
+      const response = await fetch(url, {
+        method: isEdit ? 'PUT' : 'POST',
         headers,
         body: JSON.stringify(payload),
       });
@@ -62,7 +80,7 @@ export default function AddPetModal({ onClose, onPetAdded }: AddPetModalProps) {
       console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
       if (!response.ok) {
-        let errorMessage = 'Failed to add pet';
+        let errorMessage = isEdit ? 'Failed to update pet' : 'Failed to add pet';
         try {
           const errorData = await response.json();
           console.log('Error response:', errorData);
@@ -102,7 +120,7 @@ export default function AddPetModal({ onClose, onPetAdded }: AddPetModalProps) {
       onPetAdded();
     } catch (error) {
       console.error('Pet creation error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to add pet. Please try again.';
+      const errorMessage = error instanceof Error ? error.message : (isEdit ? 'Failed to update pet. Please try again.' : 'Failed to add pet. Please try again.');
       setError(errorMessage);
     } finally {
       setLoading(false);
@@ -121,7 +139,7 @@ export default function AddPetModal({ onClose, onPetAdded }: AddPetModalProps) {
     <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-gray-900">Add New Pet</h2>
+          <h2 className="text-2xl font-bold text-gray-900">{isEdit ? 'Update Pet' : 'Add New Pet'}</h2>
           <button
             onClick={onClose}
             className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
@@ -282,7 +300,7 @@ export default function AddPetModal({ onClose, onPetAdded }: AddPetModalProps) {
               disabled={loading}
               className="flex-1 px-4 py-2 bg-gradient-to-r from-orange-500 to-pink-500 text-white rounded-lg hover:from-orange-600 hover:to-pink-600 transition-all duration-300 disabled:opacity-50"
             >
-              {loading ? 'Adding...' : 'Add Pet'}
+              {loading ? (isEdit ? 'Saving...' : 'Adding...') : (isEdit ? 'Save Changes' : 'Add Pet')}
             </button>
           </div>
         </form>
