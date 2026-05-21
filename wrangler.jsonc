@@ -11,14 +11,11 @@
   "assets": {
     "not_found_handling": "single-page-application",
   },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "01996b57-7f52-765c-be5f-a04e0ce8c681",
-      "database_id": "01996b57-7f52-765c-be5f-a04e0ce8c681",
-    },
-  ],
   "vars": {
-    "JWT_SECRET": "your-super-secret-jwt-key-change-this-in-production"
+    "JWT_SECRET": "your-super-secret-jwt-key-change-this-in-production",
+    "MONGO_URI": "your-mongodb-connection-string",
+    "MONGO_DB_NAME": "pawpal",
+    "MOCHA_USERS_SERVICE_API_URL": "your-mocha-api-url",
+    "MOCHA_USERS_SERVICE_API_KEY": "your-mocha-api-key"
   },
 }
